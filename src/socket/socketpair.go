@@ -103,12 +103,11 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 
 	select {
 	case sock := <-socks:
-		pair.server.Close()
-
 		if err := sock.Secure(isclient); err != nil {
 			return err
 		}
 
+		pair.server.Close()
 		pair.sock = sock
 
 		return nil
