@@ -3,7 +3,6 @@ package socket
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"time"
