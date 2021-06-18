@@ -11,16 +11,20 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 )
 
 func main() {
+	var help bool
 	var myipstr string
 	var peeripstr string
 	var lport int
 	var rport int
 	var verbose bool
 
+	flag.BoolVar(&help, "h", false, "show usage information and exit")
 	flag.StringVar(&myipstr, "myip", "", "your public IPv4 address")
 	flag.StringVar(&peeripstr, "peerip", "", "peer's public IPv4 address")
 	flag.IntVar(&lport, "lport", 54312, "local port you're listening on")
@@ -28,6 +32,22 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "increases logging verbosity")
 
 	flag.Parse()
+
+	if help {
+		fmt.Fprintln(os.Stderr, `Usage of tete:
+	-h	show usage information and exit
+  	-lport int
+    	local port you're listening on (default 54312)
+  	-myip string
+    	your public IPv4 address
+  	-peerip string
+    	peer's public IPv4 address
+  	-rport int
+    	remote port the peer's listening on (default 54312)
+  	-v	increases logging verbosity`)
+
+		os.Exit(0)
+	}
 
 	myip := net.ParseIP(myipstr)
 
@@ -81,6 +101,16 @@ func main() {
 
 	log.Println("Connected to peer!")
 
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-ch
+		pair.Close()
+		log.Println("Closed connection")
+		os.Exit(0)
+	}()
+
 	go func() {
 		var buf bytes.Buffer
 		scanner := bufio.NewScanner(os.Stdin)
@@ -112,5 +142,6 @@ func main() {
 		fmt.Printf("Message from peer: %s\n", text)
 	}
 
+	pair.Close()
 	log.Println("Peer closed connection")
 }

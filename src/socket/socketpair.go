@@ -35,6 +35,26 @@ func (pair *SocketPair) Bind(lport int) error {
 	return pair.server.Bind(lport)
 }
 
+func (pair *SocketPair) Close() error {
+	if pair.client != nil {
+		if err := pair.client.Close(); err != nil {
+			return err
+		}
+	}
+
+	if err := pair.server.Close(); err != nil {
+		return err
+	}
+
+	if pair.sock != nil {
+		if err := pair.sock.Close(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 	socks := make(chan *Socket)
 	errs := make(chan error)
@@ -107,7 +127,6 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 			return err
 		}
 
-		pair.server.Close()
 		pair.sock = sock
 
 		return nil
