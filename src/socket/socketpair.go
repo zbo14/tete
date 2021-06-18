@@ -104,8 +104,10 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
 
 	select {
 	case res := <-conns:
-		if err := res.conn.Handshake(); err != nil {
-			return err
+		if res.isclient {
+			if err := res.conn.Handshake(); err != nil {
+				return err
+			}
 		}
 
 		pair.conn = res.conn

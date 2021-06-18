@@ -32,12 +32,12 @@ func main() {
 		log.Fatalln(errors.New("Invalid IPv4 address"))
 	}
 
-	if lport < 0 || lport > 65535 {
-		log.Fatalln(errors.New("Local port must be >= 0 and < 65536"))
+	if lport < 1 || lport > 65535 {
+		log.Fatalln(errors.New("Local port must be > 0 and < 65536"))
 	}
 
-	if rport < 0 || rport > 65535 {
-		log.Fatalln(errors.New("Remote port must be >= 0 and < 65536"))
+	if rport < 1 || rport > 65535 {
+		log.Fatalln(errors.New("Remote port must be > 0 and < 65536"))
 	}
 
 	if !verbose {

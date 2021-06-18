@@ -75,19 +75,34 @@ func (sock *Socket) Connect(ip [4]byte, rport int) error {
 		Addr: ip,
 	}
 
-	if err := unix.Connect(sock.fd, sockaddr); err != nil {
+	errs := make(chan error)
+	timer := time.NewTimer(3 * time.Second)
+
+	go func() {
+		if err := unix.Connect(sock.fd, sockaddr); err != nil {
+			errs <- err
+			return
+		}
+
+		sock.raddr = &Addr{
+			ip:       ip,
+			port:     rport,
+			sockaddr: sockaddr,
+		}
+
+		sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
+
+		errs <- nil
+	}()
+
+	select {
+	case err := <-errs:
+		timer.Stop()
 		return err
+
+	case <-timer.C:
+		return errors.New("socket.Connect() timed out")
 	}
-
-	sock.raddr = &Addr{
-		ip:       ip,
-		port:     rport,
-		sockaddr: sockaddr,
-	}
-
-	sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
-
-	return nil
 }
 
 func (sock *Socket) Listen() error {
