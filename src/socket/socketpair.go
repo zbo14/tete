@@ -20,31 +20,18 @@ type Result struct {
 }
 
 func NewSocketPair() (*SocketPair, error) {
-	client, err := NewSocket()
-
-	if err != nil {
-		return nil, err
-	}
-
 	server, err := NewSocket()
 
 	if err != nil {
 		return nil, err
 	}
 
-	pair := &SocketPair{
-		client: client,
-		server: server,
-	}
+	pair := &SocketPair{server: server}
 
 	return pair, nil
 }
 
 func (pair *SocketPair) Bind(lport int) error {
-	if err := pair.client.Bind(lport); err != nil {
-		return err
-	}
-
 	return pair.server.Bind(lport)
 }
 
@@ -61,12 +48,28 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 			default:
 			}
 
-			if err := pair.client.Connect(ip, rport); err != nil {
+			client, err := NewSocket()
+
+			if err != nil {
+				errs <- err
+				client.Close()
+				return
+			}
+
+			if err := client.Bind(pair.server.laddr.port); err != nil {
+				errs <- err
+				client.Close()
+				return
+			}
+
+			if err := client.Connect(ip, rport); err != nil {
+				client.Close()
 				log.Println("socket.Connect()", err)
 				time.Sleep(time.Second)
 				continue
 			}
 
+			pair.client = client
 			socks <- pair.client
 
 			return
@@ -100,6 +103,8 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 
 	select {
 	case sock := <-socks:
+		pair.server.Close()
+
 		if err := sock.Secure(isclient); err != nil {
 			return err
 		}

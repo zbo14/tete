@@ -79,6 +79,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	log.Println("Connected to peer!")
+
 	go func() {
 		var buf bytes.Buffer
 		scanner := bufio.NewScanner(os.Stdin)
