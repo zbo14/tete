@@ -159,7 +159,7 @@ func (sock *Socket) Secure(isclient bool) error {
 	if isclient {
 		sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
 
-		return sock.conn.Handshake()
+		return nil
 	}
 
 	pubkey, privkey, err := cert.GenerateKey()

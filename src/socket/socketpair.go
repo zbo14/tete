@@ -105,7 +105,6 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 			return err
 		}
 
-		fmt.Println(sock.conn.ConnectionState().HandshakeComplete)
 		pair.sock = sock
 
 		return nil
