@@ -11,25 +11,40 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
-	var ipstr string
+	var myipstr string
+	var peeripstr string
 	var lport int
 	var rport int
 	var verbose bool
 
-	flag.StringVar(&ipstr, "ip", "", "public IPv4 address to connect to")
-	flag.IntVar(&lport, "lport", 54312, "local port to listen on")
-	flag.IntVar(&rport, "rport", 54312, "remote port to connect to")
-	flag.BoolVar(&verbose, "v", false, "increase logging verbosity")
+	flag.StringVar(&myipstr, "myip", "", "your public IPv4 address")
+	flag.StringVar(&peeripstr, "peerip", "", "peer's public IPv4 address")
+	flag.IntVar(&lport, "lport", 54312, "local port you're listening on")
+	flag.IntVar(&rport, "rport", 54312, "remote port the peer's listening on")
+	flag.BoolVar(&verbose, "v", false, "increases logging verbosity")
 
 	flag.Parse()
 
-	ip := net.ParseIP(ipstr)
+	myip := net.ParseIP(myipstr)
 
-	if ip == nil {
-		log.Fatalln(errors.New("Invalid IPv4 address"))
+	if myip == nil {
+		log.Fatalln(errors.New("Invalid public IPv4 address"))
+	}
+
+	peerip := net.ParseIP(peeripstr)
+
+	if peerip == nil {
+		log.Fatalln(errors.New("Invalid IPv4 address for peer"))
+	}
+
+	ipcmp := strings.Compare(myipstr, peeripstr)
+
+	if ipcmp == 0 {
+		log.Fatalln(errors.New("You and peer cannot use same IPv4 address"))
 	}
 
 	if lport < 1 || lport > 65535 {
@@ -55,9 +70,12 @@ func main() {
 	}
 
 	var ipbuf [4]byte
-	copy(ipbuf[:], ip[len(ip)-4:])
 
-	if err := pair.Connect(ipbuf, rport); err != nil {
+	copy(ipbuf[:], peerip[len(peerip)-4:])
+
+	isclient := ipcmp == 1
+
+	if err := pair.Connect(ipbuf, rport, isclient); err != nil {
 		log.Fatalln(err)
 	}
 

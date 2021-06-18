@@ -3,16 +3,16 @@ package socket
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"time"
 )
 
 type SocketPair struct {
-	client   *Socket
-	conn     *tls.Conn
-	isclient bool
-	server   *Socket
+	client *Socket
+	server *Socket
+	sock   *Socket
 }
 
 type Result struct {
@@ -49,8 +49,8 @@ func (pair *SocketPair) Bind(lport int) error {
 	return pair.server.Bind(lport)
 }
 
-func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
-	conns := make(chan *Result)
+func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
+	socks := make(chan *Socket)
 	errs := make(chan error)
 	stop := make(chan struct{})
 
@@ -68,10 +68,7 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
 				continue
 			}
 
-			conns <- &Result{
-				conn:     pair.client.conn,
-				isclient: true,
-			}
+			socks <- pair.client
 
 			return
 		}
@@ -93,7 +90,7 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
 				continue
 			}
 
-			conns <- &Result{conn: sock.conn}
+			socks <- sock
 			stop <- struct{}{}
 
 			return
@@ -103,15 +100,13 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
 	}()
 
 	select {
-	case res := <-conns:
-		if res.isclient {
-			if err := res.conn.Handshake(); err != nil {
-				return err
-			}
+	case sock := <-socks:
+		if err := sock.Secure(isclient); err != nil {
+			return err
 		}
 
-		pair.conn = res.conn
-		pair.isclient = res.isclient
+		fmt.Println(sock.conn.ConnectionState().HandshakeComplete)
+		pair.sock = sock
 
 		return nil
 
@@ -120,66 +115,50 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int) error {
 	}
 }
 
-func (pair *SocketPair) IsClient() (bool, error) {
-	if pair.conn == nil {
-		return false, errors.New("SocketPair not connected")
-	}
-
-	return pair.isclient, nil
-}
-
 func (pair *SocketPair) Read(b []byte) (n int, err error) {
-	if pair.conn == nil {
+	if pair.sock == nil {
 		return 0, errors.New("SocketPair not connected")
 	}
 
-	return pair.conn.Read(b)
+	return pair.sock.conn.Read(b)
 }
 
 func (pair *SocketPair) Write(b []byte) (n int, err error) {
-	if pair.conn == nil {
+	if pair.sock == nil {
 		return 0, errors.New("SocketPair not connected")
 	}
 
-	return pair.conn.Write(b)
+	return pair.sock.conn.Write(b)
 }
 
 func (pair *SocketPair) LocalAddr() net.Addr {
-	if pair.isclient {
-		return pair.client.laddr
-	} else {
-		return pair.server.laddr
-	}
+	return pair.sock.laddr
 }
 
 func (pair *SocketPair) RemoteAddr() net.Addr {
-	if pair.isclient {
-		return pair.client.raddr
-	} else {
-		return pair.server.raddr
-	}
+	return pair.sock.raddr
 }
 
 func (pair *SocketPair) SetDeadline(t time.Time) error {
-	if pair.conn == nil {
+	if pair.sock == nil {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.conn.SetDeadline(t)
+	return pair.sock.conn.SetDeadline(t)
 }
 
 func (pair *SocketPair) SetReadDeadline(t time.Time) error {
-	if pair.conn == nil {
+	if pair.sock == nil {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.conn.SetReadDeadline(t)
+	return pair.sock.conn.SetReadDeadline(t)
 }
 
 func (pair *SocketPair) SetWriteDeadline(t time.Time) error {
-	if pair.conn == nil {
+	if pair.sock == nil {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.conn.SetWriteDeadline(t)
+	return pair.sock.conn.SetWriteDeadline(t)
 }

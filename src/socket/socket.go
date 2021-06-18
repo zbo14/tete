@@ -91,8 +91,6 @@ func (sock *Socket) Connect(ip [4]byte, rport int) error {
 			sockaddr: sockaddr,
 		}
 
-		sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
-
 		errs <- nil
 	}()
 
@@ -135,24 +133,6 @@ func (sock *Socket) Accept(ip [4]byte, rport int) (*Socket, error) {
 		return nil, err
 	}
 
-	pubkey, privkey, err := cert.GenerateKey()
-
-	if err != nil {
-		return nil, err
-	}
-
-	der, err := cert.CreateCertificate(pubkey, privkey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	leaf, err := x509.ParseCertificate(der)
-
-	if err != nil {
-		return nil, err
-	}
-
 	laddr := &Addr{
 		ip:       lsockaddr.(*unix.SockaddrInet4).Addr,
 		port:     lsockaddr.(*unix.SockaddrInet4).Port,
@@ -172,15 +152,43 @@ func (sock *Socket) Accept(ip [4]byte, rport int) (*Socket, error) {
 		raddr: raddr,
 	}
 
+	return newsock, nil
+}
+
+func (sock *Socket) Secure(isclient bool) error {
+	if isclient {
+		sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
+
+		return sock.conn.Handshake()
+	}
+
+	pubkey, privkey, err := cert.GenerateKey()
+
+	if err != nil {
+		return err
+	}
+
+	der, err := cert.CreateCertificate(pubkey, privkey)
+
+	if err != nil {
+		return err
+	}
+
+	leaf, err := x509.ParseCertificate(der)
+
+	if err != nil {
+		return err
+	}
+
 	cert := tls.Certificate{
 		Certificate: [][]byte{der},
 		Leaf:        leaf,
 		PrivateKey:  privkey,
 	}
 
-	newsock.conn = tls.Server(newsock, &tls.Config{Certificates: []tls.Certificate{cert}})
+	sock.conn = tls.Server(sock, &tls.Config{Certificates: []tls.Certificate{cert}})
 
-	return newsock, nil
+	return nil
 }
 
 func (sock *Socket) Read(b []byte) (n int, err error) {
