@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"github.com/zbo14/tete/src/cert"
 	"golang.org/x/sys/unix"
