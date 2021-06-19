@@ -31,7 +31,6 @@ func NewSocket(myip net.IP, lport int) (*Socket, error) {
 
 	if ipv4 := myip.To4(); ipv4 != nil {
 		var addr [4]byte
-		copy(addr[:], ipv4)
 
 		domain = unix.AF_INET
 
@@ -40,10 +39,7 @@ func NewSocket(myip net.IP, lport int) (*Socket, error) {
 			Port: lport,
 		}
 	} else {
-		ipv6 := myip.To16()
-
 		var addr [16]byte
-		copy(addr[:], ipv6)
 
 		domain = unix.AF_INET6
 
