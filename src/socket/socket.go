@@ -79,7 +79,11 @@ func NewSocket(myip net.IP, lport int) (*Socket, error) {
 }
 
 func (sock *Socket) Close() error {
-	return sock.file.Close()
+	if err := sock.file.Close(); err != nil {
+		return err
+	}
+
+	return unix.Close(sock.fd)
 }
 
 func (sock *Socket) Connect(peerip net.IP, port int) error {
