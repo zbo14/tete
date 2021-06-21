@@ -205,15 +205,19 @@ func (sock *Socket) Accept(ip net.IP, rport int) (*Socket, error) {
 	return newsock, nil
 }
 
-func setKeepAlive(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
-	if conn, ok := clientHello.Conn.(*net.TCPConn); ok {
-		conn.SetKeepAlivePeriod(10 * time.Second)
+func (sock *Socket) Secure(isclient bool, keepalive bool) error {
+	setKeepAlive := func(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
+		if !keepalive {
+			return nil, nil
+		}
+
+		if conn, ok := clientHello.Conn.(*net.TCPConn); ok {
+			conn.SetKeepAlivePeriod(10 * time.Second)
+		}
+
+		return nil, nil
 	}
 
-	return nil, nil
-}
-
-func (sock *Socket) Secure(isclient bool) error {
 	if isclient {
 		config := &tls.Config{
 			GetConfigForClient: setKeepAlive,

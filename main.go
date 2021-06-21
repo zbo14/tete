@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/zbo14/tete/src/socket"
 	"io/ioutil"
 	"log"
@@ -21,6 +19,7 @@ func main() {
 	var peeripaddr string
 	var lport int
 	var rport int
+	var keepalive bool
 	var verbose bool
 
 	flag.BoolVar(&help, "h", false, "show usage information and exit")
@@ -28,13 +27,15 @@ func main() {
 	flag.StringVar(&peeripaddr, "peerip", "", "peer's public IPv4/IPv6 address")
 	flag.IntVar(&lport, "lport", 54312, "local port you're listening on")
 	flag.IntVar(&rport, "rport", 54312, "remote port the peer's listening on")
+	flag.BoolVar(&keepalive, "k", false, "enable TCP keepalives")
 	flag.BoolVar(&verbose, "v", false, "increases logging verbosity")
 
 	flag.Parse()
 
 	if help {
-		fmt.Fprintln(os.Stderr, `Usage of tete:
+		log.Println(`Usage of tete:
 	-h	show usage information and exit
+	-k  enable TCP keepalives
   	-lport int
     	local port you're listening on (default 54312)
   	-myip string
@@ -76,7 +77,7 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	pair, err := socket.Connect(myip, lport, peerip, rport)
+	pair, err := socket.Connect(myip, lport, peerip, rport, keepalive)
 
 	if err != nil {
 		log.Fatalln(err)
@@ -94,36 +95,11 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go func() {
-		var buf bytes.Buffer
-		scanner := bufio.NewScanner(os.Stdin)
+	reader := bufio.NewReader(pair)
+	writer := bufio.NewWriter(pair)
 
-		for scanner.Scan() {
-			text := scanner.Text()
-
-			buf.WriteString(text)
-			buf.WriteString("\n")
-
-			n, err := pair.Write(buf.Bytes())
-
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			if buf.Len() != n {
-				log.Fatalln(errors.New("Failed to write entire message"))
-			}
-
-			buf.Reset()
-		}
-	}()
-
-	scanner := bufio.NewScanner(pair)
-
-	for scanner.Scan() {
-		text := scanner.Text()
-		fmt.Printf("Message from peer: %s\n", text)
-	}
+	go writer.ReadFrom(os.Stdin)
+	reader.WriteTo(os.Stdout)
 
 	pair.Close()
 	log.Println("Peer closed connection")

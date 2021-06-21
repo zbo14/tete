@@ -35,7 +35,7 @@ func NewSocketPair(myip net.IP, lport int) (*SocketPair, error) {
 	return pair, nil
 }
 
-func Connect(myip net.IP, lport int, peerip net.IP, rport int) (*SocketPair, error) {
+func Connect(myip net.IP, lport int, peerip net.IP, rport int, keepalive bool) (*SocketPair, error) {
 	pair, err := NewSocketPair(myip, lport)
 
 	if err != nil {
@@ -44,7 +44,7 @@ func Connect(myip net.IP, lport int, peerip net.IP, rport int) (*SocketPair, err
 
 	isclient := bytes.Compare(myip, peerip) == 1
 
-	if err := pair.Connect(peerip, rport, isclient); err != nil {
+	if err := pair.Connect(peerip, rport, isclient, keepalive); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +65,7 @@ func (pair *SocketPair) Close() error {
 	return nil
 }
 
-func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool) error {
+func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool, keepalive bool) error {
 	socks := make(chan *Socket)
 	errs := make(chan error)
 	stop := make(chan struct{})
@@ -117,7 +117,7 @@ func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool) error {
 
 	select {
 	case sock := <-socks:
-		if err := sock.Secure(isclient); err != nil {
+		if err := sock.Secure(isclient, keepalive); err != nil {
 			return err
 		}
 
