@@ -78,9 +78,11 @@ func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool, keepali
 
 			default:
 				if err := pair.client.Connect(peerip, rport); err != nil {
-					log.Println("socket.Connect()", err)
-					time.Sleep(time.Second)
-					continue
+					if err.Error() != "transport endpoint is already connected" {
+						log.Println(err)
+						time.Sleep(time.Second)
+						continue
+					}
 				}
 
 				socks <- pair.client

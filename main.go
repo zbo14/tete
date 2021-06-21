@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"github.com/zbo14/tete/src/socket"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -95,11 +95,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	reader := bufio.NewReader(pair)
-	writer := bufio.NewWriter(pair)
-
-	go writer.ReadFrom(os.Stdin)
-	reader.WriteTo(os.Stdout)
+	go io.Copy(os.Stdout, pair)
+	io.Copy(pair, os.Stdin)
 
 	pair.Close()
 	log.Println("Peer closed connection")
