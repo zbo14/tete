@@ -15,13 +15,22 @@ type SocketPair struct {
 }
 
 func NewSocketPair(myip net.IP, lport int) (*SocketPair, error) {
+	client, err := NewSocket(myip, lport)
+
+	if err != nil {
+		return nil, err
+	}
+
 	server, err := NewSocket(myip, lport)
 
 	if err != nil {
 		return nil, err
 	}
 
-	pair := &SocketPair{server: server}
+	pair := &SocketPair{
+		client: client,
+		server: server,
+	}
 
 	return pair, nil
 }
@@ -66,27 +75,18 @@ func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool) error {
 			select {
 			case <-stop:
 				return
+
 			default:
-			}
+				if err := pair.client.Connect(peerip, rport); err != nil {
+					log.Println("socket.Connect()", err)
+					time.Sleep(time.Second)
+					continue
+				}
 
-			sock, err := NewSocket(pair.server.myip, pair.server.lport)
+				socks <- pair.client
 
-			if err != nil {
-				errs <- err
-				sock.Close()
 				return
 			}
-
-			if err := sock.Connect(peerip, rport); err != nil {
-				sock.Close()
-				log.Println("socket.Connect()", err)
-				time.Sleep(time.Second)
-				continue
-			}
-
-			socks <- sock
-
-			return
 		}
 
 		errs <- errors.New("Failed to connect to remote peer")
