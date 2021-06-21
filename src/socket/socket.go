@@ -205,9 +205,22 @@ func (sock *Socket) Accept(ip net.IP, rport int) (*Socket, error) {
 	return newsock, nil
 }
 
+func setKeepAlive(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
+	if conn, ok := clientHello.Conn.(*net.TCPConn); ok {
+		conn.SetKeepAlivePeriod(10 * time.Second)
+	}
+
+	return nil, nil
+}
+
 func (sock *Socket) Secure(isclient bool) error {
 	if isclient {
-		sock.conn = tls.Client(sock, &tls.Config{InsecureSkipVerify: true})
+		config := &tls.Config{
+			GetConfigForClient: setKeepAlive,
+			InsecureSkipVerify: true,
+		}
+
+		sock.conn = tls.Client(sock, config)
 
 		return nil
 	}
@@ -236,7 +249,12 @@ func (sock *Socket) Secure(isclient bool) error {
 		PrivateKey:  privkey,
 	}
 
-	sock.conn = tls.Server(sock, &tls.Config{Certificates: []tls.Certificate{cert}})
+	config := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		GetConfigForClient: setKeepAlive,
+	}
+
+	sock.conn = tls.Server(sock, config)
 
 	return nil
 }

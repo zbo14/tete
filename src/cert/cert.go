@@ -11,7 +11,7 @@ import (
 )
 
 func CreateCertificate(pubkey crypto.PublicKey, privkey crypto.PrivateKey) (der []byte, err error) {
-	keyUsage := x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+	keyUsage := x509.KeyUsageDigitalSignature
 	notBefore := time.Now()
 	notAfter := notBefore.Add(24 * time.Hour * 7)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)

@@ -6,6 +6,8 @@ Peer-to-peer TLS connections through firewalls via TCP hole-punching.
 
 ## Why?
 
+TODO
+
 ## Install
 
 `go get -u github.com/zbo14/tete`
