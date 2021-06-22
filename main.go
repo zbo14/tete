@@ -95,8 +95,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go io.Copy(os.Stdout, pair)
-	io.Copy(pair, os.Stdin)
+	go io.Copy(pair, os.Stdin)
+	io.Copy(os.Stdout, pair)
 
 	pair.Close()
 	log.Println("Peer closed connection")
