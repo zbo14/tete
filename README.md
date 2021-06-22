@@ -20,9 +20,9 @@ This repository contains a command line tool that does the following:
 
 * Establish TLS connections between peers on different networks
 * Read data from stdin and send it over a connection
-* Read encrypted data over a connection and write decrypted data to stdout
+* Read encrypted data from connection and write decrypted data to stdout
 
-This makes `tete` easy to use with other tools (e.g. by piping to other commands).
+This makes `tete` easy to use with other tools (e.g. by piping to UNIX commands or other CLIs).
 
 ## Install
 
@@ -42,7 +42,7 @@ In his terminal, Bob would type:
 
 `$ tete -myip 5.6.7.8 -peerip 1.2.3.4 -lport 56789 -rport 12345`
 
-**Note:** each peer *must* specify its own public IP address. Public IP address comparison determines which peer acts as a server (and which acts as a client) in the TLS handshake.
+**Note:** each peer *must* specify their own public IP address. IP address comparison determines which peer acts as a server (and which acts as a client) in the TLS handshake.
 
 After pressing enter, they both should see the following printed to stderr:
 
