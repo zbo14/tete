@@ -1,7 +1,7 @@
 package socket
 
 import (
-	"crypto/tls"
+	"bytes"
 	"errors"
 	"log"
 	"net"
@@ -9,30 +9,46 @@ import (
 )
 
 type SocketPair struct {
-	client *Socket
-	server *Socket
-	sock   *Socket
+	client      *Socket
+	server      *Socket
+	isconnected bool
 }
 
-type Result struct {
-	conn     *tls.Conn
-	isclient bool
-}
-
-func NewSocketPair() (*SocketPair, error) {
-	server, err := NewSocket()
+func NewSocketPair(myip net.IP, lport int) (*SocketPair, error) {
+	client, err := NewSocket(myip, lport)
 
 	if err != nil {
 		return nil, err
 	}
 
-	pair := &SocketPair{server: server}
+	server, err := NewSocket(myip, lport)
+
+	if err != nil {
+		return nil, err
+	}
+
+	pair := &SocketPair{
+		client: client,
+		server: server,
+	}
 
 	return pair, nil
 }
 
-func (pair *SocketPair) Bind(lport int) error {
-	return pair.server.Bind(lport)
+func Connect(myip net.IP, lport int, peerip net.IP, rport int, keepalive bool) (*SocketPair, error) {
+	pair, err := NewSocketPair(myip, lport)
+
+	if err != nil {
+		return nil, err
+	}
+
+	isclient := bytes.Compare(myip, peerip) == 1
+
+	if err := pair.Connect(peerip, rport, isclient, keepalive); err != nil {
+		return nil, err
+	}
+
+	return pair, nil
 }
 
 func (pair *SocketPair) Close() error {
@@ -46,16 +62,10 @@ func (pair *SocketPair) Close() error {
 		return err
 	}
 
-	if pair.sock != nil {
-		if err := pair.sock.Close(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
+func (pair *SocketPair) Connect(peerip net.IP, rport int, isclient bool, keepalive bool) error {
 	socks := make(chan *Socket)
 	errs := make(chan error)
 	stop := make(chan struct{})
@@ -65,34 +75,20 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 			select {
 			case <-stop:
 				return
+
 			default:
-			}
+				if err := pair.client.Connect(peerip, rport); err != nil {
+					if err.Error() != "transport endpoint is already connected" {
+						log.Println(err)
+						time.Sleep(time.Second)
+						continue
+					}
+				}
 
-			client, err := NewSocket()
+				socks <- pair.client
 
-			if err != nil {
-				errs <- err
-				client.Close()
 				return
 			}
-
-			if err := client.Bind(pair.server.laddr.port); err != nil {
-				errs <- err
-				client.Close()
-				return
-			}
-
-			if err := client.Connect(ip, rport); err != nil {
-				client.Close()
-				log.Println("socket.Connect()", err)
-				time.Sleep(time.Second)
-				continue
-			}
-
-			pair.client = client
-			socks <- pair.client
-
-			return
 		}
 
 		errs <- errors.New("Failed to connect to remote peer")
@@ -105,7 +101,7 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 		}
 
 		for i := 0; i < 10; i++ {
-			sock, err := pair.server.Accept(ip, rport)
+			sock, err := pair.server.Accept(peerip, rport)
 
 			if err != nil {
 				log.Println("socket.Accept()", err)
@@ -123,11 +119,12 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 
 	select {
 	case sock := <-socks:
-		if err := sock.Secure(isclient); err != nil {
+		if err := sock.Secure(isclient, keepalive); err != nil {
 			return err
 		}
 
-		pair.sock = sock
+		pair.client = sock
+		pair.isconnected = true
 
 		return nil
 
@@ -137,49 +134,49 @@ func (pair *SocketPair) Connect(ip [4]byte, rport int, isclient bool) error {
 }
 
 func (pair *SocketPair) Read(b []byte) (n int, err error) {
-	if pair.sock == nil {
+	if !pair.isconnected {
 		return 0, errors.New("SocketPair not connected")
 	}
 
-	return pair.sock.conn.Read(b)
+	return pair.client.conn.Read(b)
 }
 
 func (pair *SocketPair) Write(b []byte) (n int, err error) {
-	if pair.sock == nil {
+	if !pair.isconnected {
 		return 0, errors.New("SocketPair not connected")
 	}
 
-	return pair.sock.conn.Write(b)
+	return pair.client.conn.Write(b)
 }
 
 func (pair *SocketPair) LocalAddr() net.Addr {
-	return pair.sock.laddr
+	return pair.client.laddr
 }
 
 func (pair *SocketPair) RemoteAddr() net.Addr {
-	return pair.sock.raddr
+	return pair.client.raddr
 }
 
 func (pair *SocketPair) SetDeadline(t time.Time) error {
-	if pair.sock == nil {
+	if !pair.isconnected {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.sock.conn.SetDeadline(t)
+	return pair.client.conn.SetDeadline(t)
 }
 
 func (pair *SocketPair) SetReadDeadline(t time.Time) error {
-	if pair.sock == nil {
+	if !pair.isconnected {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.sock.conn.SetReadDeadline(t)
+	return pair.client.conn.SetReadDeadline(t)
 }
 
 func (pair *SocketPair) SetWriteDeadline(t time.Time) error {
-	if pair.sock == nil {
+	if !pair.isconnected {
 		return errors.New("SocketPair not connected")
 	}
 
-	return pair.sock.conn.SetWriteDeadline(t)
+	return pair.client.conn.SetWriteDeadline(t)
 }

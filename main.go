@@ -1,47 +1,47 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/zbo14/tete/src/socket"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 )
 
 func main() {
 	var help bool
-	var myipstr string
-	var peeripstr string
+	var myipaddr string
+	var peeripaddr string
 	var lport int
 	var rport int
+	var keepalive bool
 	var verbose bool
 
 	flag.BoolVar(&help, "h", false, "show usage information and exit")
-	flag.StringVar(&myipstr, "myip", "", "your public IPv4 address")
-	flag.StringVar(&peeripstr, "peerip", "", "peer's public IPv4 address")
+	flag.StringVar(&myipaddr, "myip", "", "your public IPv4/IPv6 address")
+	flag.StringVar(&peeripaddr, "peerip", "", "peer's public IPv4/IPv6 address")
 	flag.IntVar(&lport, "lport", 54312, "local port you're listening on")
 	flag.IntVar(&rport, "rport", 54312, "remote port the peer's listening on")
+	flag.BoolVar(&keepalive, "k", false, "enable TCP keepalives")
 	flag.BoolVar(&verbose, "v", false, "increases logging verbosity")
 
 	flag.Parse()
 
 	if help {
-		fmt.Fprintln(os.Stderr, `Usage of tete:
+		log.Println(`Usage of tete:
 	-h	show usage information and exit
+	-k  enable TCP keepalives
   	-lport int
     	local port you're listening on (default 54312)
   	-myip string
-    	your public IPv4 address
+    	your public IPv4/IPv6 address
   	-peerip string
-    	peer's public IPv4 address
+    	peer's public IPv4/IPv6 address
   	-rport int
     	remote port the peer's listening on (default 54312)
   	-v	increases logging verbosity`)
@@ -49,22 +49,20 @@ func main() {
 		os.Exit(0)
 	}
 
-	myip := net.ParseIP(myipstr)
+	myip := net.ParseIP(myipaddr)
 
 	if myip == nil {
-		log.Fatalln(errors.New("Invalid public IPv4 address"))
+		log.Fatalln(errors.New("Invalid public IP address"))
 	}
 
-	peerip := net.ParseIP(peeripstr)
+	peerip := net.ParseIP(peeripaddr)
 
 	if peerip == nil {
-		log.Fatalln(errors.New("Invalid IPv4 address for peer"))
+		log.Fatalln(errors.New("Invalid IP address for peer"))
 	}
 
-	ipcmp := strings.Compare(myipstr, peeripstr)
-
-	if ipcmp == 0 {
-		log.Fatalln(errors.New("You and peer cannot use same IPv4 address"))
+	if myip.Equal(peerip) {
+		log.Fatalln(errors.New("Cannot have same IP address as peer"))
 	}
 
 	if lport < 1 || lport > 65535 {
@@ -79,23 +77,9 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	pair, err := socket.NewSocketPair()
+	pair, err := socket.Connect(myip, lport, peerip, rport, keepalive)
 
 	if err != nil {
-		log.Fatalln(err)
-	}
-
-	if err := pair.Bind(lport); err != nil {
-		log.Fatalln(err)
-	}
-
-	var ipbuf [4]byte
-
-	copy(ipbuf[:], peerip[len(peerip)-4:])
-
-	isclient := ipcmp == 1
-
-	if err := pair.Connect(ipbuf, rport, isclient); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -111,36 +95,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	go func() {
-		var buf bytes.Buffer
-		scanner := bufio.NewScanner(os.Stdin)
-
-		for scanner.Scan() {
-			text := scanner.Text()
-
-			buf.WriteString(text)
-			buf.WriteString("\n")
-
-			n, err := pair.Write(buf.Bytes())
-
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			if buf.Len() != n {
-				log.Fatalln(errors.New("Failed to write entire message"))
-			}
-
-			buf.Reset()
-		}
-	}()
-
-	scanner := bufio.NewScanner(pair)
-
-	for scanner.Scan() {
-		text := scanner.Text()
-		fmt.Printf("Message from peer: %s\n", text)
-	}
+	go io.Copy(pair, os.Stdin)
+	io.Copy(os.Stdout, pair)
 
 	pair.Close()
 	log.Println("Peer closed connection")
