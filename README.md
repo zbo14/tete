@@ -30,9 +30,9 @@ This makes `tete` easy to use with other tools (e.g. by piping to UNIX commands 
 
 ## Usage
 
-Suppose Alice has public IPv4 address, "1.2.3.4", and port number, 12345.
+Suppose Alice (rather, the router on her home network) has public IPv4 address "1.2.3.4". Her computer has a process listening on port 12345.
 
-Bob has public IPv4 address, "5.6.7.8", and port number, 56789.
+Bob is behind a router with public IPv4 address "5.6.7.8". His machine is listening on port 56789.
 
 In her terminal, Alice would type:
 
@@ -42,7 +42,7 @@ In his terminal, Bob would type:
 
 `$ tete -myip 5.6.7.8 -peerip 1.2.3.4 -lport 56789 -rport 12345`
 
-**Note:** each peer *must* specify their own public IP address. IP address comparison determines which peer acts as a server (and which acts as a client) in the TLS handshake.
+**Note:** each peer *must* specify their own public IP address. IP address comparison determines which peer acts as a server and which acts as a client in the TLS handshake.
 
 After pressing enter, they both should see the following printed to stderr:
 
