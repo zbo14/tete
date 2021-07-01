@@ -5,7 +5,6 @@ import (
 	"flag"
 	"github.com/zbo14/tete/src/socket"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -20,7 +19,6 @@ func main() {
 	var lport int
 	var rport int
 	var keepalive bool
-	var verbose bool
 
 	flag.BoolVar(&help, "h", false, "show usage information and exit")
 	flag.StringVar(&myipaddr, "myip", "", "your public IPv4/IPv6 address")
@@ -28,7 +26,6 @@ func main() {
 	flag.IntVar(&lport, "lport", 54312, "local port you're listening on")
 	flag.IntVar(&rport, "rport", 54312, "remote port the peer's listening on")
 	flag.BoolVar(&keepalive, "k", false, "enable TCP keepalives")
-	flag.BoolVar(&verbose, "v", false, "increases logging verbosity")
 
 	flag.Parse()
 
@@ -43,8 +40,7 @@ func main() {
   	-peerip string
     	peer's public IPv4/IPv6 address
   	-rport int
-    	remote port the peer's listening on (default 54312)
-  	-v	increases logging verbosity`)
+    	remote port the peer's listening on (default 54312)`)
 
 		os.Exit(0)
 	}
@@ -71,10 +67,6 @@ func main() {
 
 	if rport < 1 || rport > 65535 {
 		log.Fatalln(errors.New("Remote port must be > 0 and < 65536"))
-	}
-
-	if !verbose {
-		log.SetOutput(ioutil.Discard)
 	}
 
 	pair, err := socket.Connect(myip, lport, peerip, rport, keepalive)

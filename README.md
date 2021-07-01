@@ -68,5 +68,4 @@ Usage of tete:
         peer's public IPv4/IPv6 address
     -rport int
         remote port the peer's listening on (default 54312)
-    -v  increases logging verbosity
 ```
